@@ -24,13 +24,13 @@ from keras.callbacks import ModelCheckpoint, TensorBoard
 from keras import regularizers
 from sklearn.preprocessing import StandardScaler
 from sklearn import preprocessing
+from sklearn.metrics import confusion_matrix
 
 #import dataset
 df=pd.read_csv("C:\\Users\\Alex\\Documents\\datasets\\spy-plane-finder\\planes_features.csv")
 
 #convert type column to integer (there are probably better approaches to use here)
 df['type']=df['type'].astype('category').cat.codes
-#df=df.drop(['type'],axis=1)###
 
 #import labelled aircraft
 test_ident = pd.read_csv("C:\\Users\\Alex\\Documents\\datasets\\spy-plane-finder\\train.csv")
@@ -42,6 +42,7 @@ labelled_data['type']=labelled_data['type'].astype('category').cat.codes
 labelled_data=labelled_data.drop(['adshex'],axis=1)
 
 df=df[~df['adshex'].isin(test_ident['adshex'])]
+df_adshex=df['adshex']
 df=df.drop(['adshex'],axis=1)
 
 #make a training and testing set and process
@@ -49,7 +50,6 @@ df=df.drop(['adshex'],axis=1)
 #use 10% of the input data as a training set
 df,train_set=train_test_split(df,test_size=0.1,random_state=57)
 
-#preprocess - consider scaling/standardising at this point
 #also consider adding some of the actual data to the train/test set to improve the size
 test_set = labelled_data
 
@@ -78,8 +78,8 @@ autoencoder = Model(inputs=input_layer, outputs=decoder)
 
 
 nb_epoch = 100
-batch_size = 500
-autoencoder.compile(optimizer='Adam', 
+batch_size = 50
+autoencoder.compile(optimizer='Adamax', 
                     loss='mean_squared_error', 
                     metrics=['accuracy'])
 checkpointer = ModelCheckpoint(filepath="model.h5",
@@ -103,12 +103,18 @@ autoencoder=load_model('model.h5')
 predictions=autoencoder.predict(test_set)
 rmse = pow(np.mean(np.power(test_set - predictions, 2), axis=1),0.5)
 error_table = pd.DataFrame({'reconstruction_error': rmse,
-                        'true_class': test_set_labels})
+                        'actual_class': test_set_labels})
 #we know how many entries have a positive in the test set. Take this number and label the predictions with the highest rmse (ie the outliers) with the positiveclass prediction
-error_table['predicted_class'] = np.where(error_table['reconstruction_error'] >= min(error_table.nlargest(test_set_positives,'reconstruction_error', keep='first')['reconstruction_error']), 'surveil', 'other')
+error_table['predicted_class'] = np.where(error_table['reconstruction_error'] >= min(error_table.nlargest(int(test_set_positives),'reconstruction_error', keep='first')['reconstruction_error']), 'surveil', 'other')
 
 #get confusion matrix
-print(confusion_matrix(error_table['true_class'],error_table['predicted_class']))
+print(confusion_matrix(error_table['actual_class'],error_table['predicted_class']))
 
 
 
+#plot error
+groups=error_table.groupby('actual_class')
+fig,ax=plt.subplots()
+for name, group in groups:
+    ax.plot(group.index,group.reconstruction_error,marker='o', ms=3.5, linestyle='',
+            label= name)
