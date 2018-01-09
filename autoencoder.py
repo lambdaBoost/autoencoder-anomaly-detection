@@ -61,8 +61,6 @@ test_set = test_set.drop(['class'], axis=1)
 train_set = train_set.values
 test_set = test_set.values
 
-#apply model to test set and evaluate by creating error sf from the predictions. 
-#Take the top 60 or so errors and see how they match up with the removed adshexes (join with train data)
 
 #define layers
 input_dim = test_set.shape[1]
@@ -77,8 +75,8 @@ decoder = Dense(input_dim, activation='relu')(decoder)
 autoencoder = Model(inputs=input_layer, outputs=decoder)
 
 
-nb_epoch = 25
-batch_size = 500
+nb_epoch = 50
+batch_size = 20000
 autoencoder.compile(optimizer='adam', 
                     loss='mean_squared_error', 
                     metrics=['accuracy'])
@@ -101,16 +99,14 @@ autoencoder=load_model('model.h5')
                           
 #predict on testing set
 predictions=autoencoder.predict(test_set)
-
-
 rmse = pow(np.mean(np.power(test_set - predictions, 2), axis=1),0.5)
-error_df = pd.DataFrame({'reconstruction_error': rmse,
+error_table = pd.DataFrame({'reconstruction_error': rmse,
                         'true_class': test_set_labels})
 #we know how many entries have a positive in the test set. Take this number and label the predictions with the highest rmse (ie the outliers) with the positiveclass prediction
-error_df['predicted_class'] = np.where(error_df['reconstruction_error'] >= min(error_df.nlargest(test_set_positives,'reconstruction_error', keep='first')['reconstruction_error']), 'surveil', 'other')
+error_table['predicted_class'] = np.where(error_table['reconstruction_error'] >= min(error_table.nlargest(test_set_positives,'reconstruction_error', keep='first')['reconstruction_error']), 'surveil', 'other')
 
 #get confusion matrix
-confusion_matrix(error_df['true_class'],error_df['predicted_class'])
+confusion_matrix(error_table['true_class'],error_table['predicted_class'])
 
-pd.write_csv(error_df,)
+
 
