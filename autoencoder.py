@@ -23,13 +23,14 @@ from keras.layers import Input, Dense
 from keras.callbacks import ModelCheckpoint, TensorBoard
 from keras import regularizers
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import confusion_matrix
+from sklearn import preprocessing
 
 #import dataset
 df=pd.read_csv("C:\\Users\\Alex\\Documents\\datasets\\spy-plane-finder\\planes_features.csv")
 
 #convert type column to integer (there are probably better approaches to use here)
 df['type']=df['type'].astype('category').cat.codes
+#df=df.drop(['type'],axis=1)###
 
 #import labelled aircraft
 test_ident = pd.read_csv("C:\\Users\\Alex\\Documents\\datasets\\spy-plane-finder\\train.csv")
@@ -58,8 +59,9 @@ test_set_labels=test_set['class']
 test_set_positives=len(test_set[test_set['class']=='surveil'])
 test_set = test_set.drop(['class'], axis=1)
 
-train_set = train_set.values
-test_set = test_set.values
+#convert to array and normalise
+train_set = preprocessing.MinMaxScaler().fit_transform(train_set.values)
+test_set = preprocessing.MinMaxScaler().fit_transform(test_set.values)
 
 
 #define layers
@@ -75,9 +77,9 @@ decoder = Dense(input_dim, activation='relu')(decoder)
 autoencoder = Model(inputs=input_layer, outputs=decoder)
 
 
-nb_epoch = 50
-batch_size = 20000
-autoencoder.compile(optimizer='adam', 
+nb_epoch = 100
+batch_size = 500
+autoencoder.compile(optimizer='Adam', 
                     loss='mean_squared_error', 
                     metrics=['accuracy'])
 checkpointer = ModelCheckpoint(filepath="model.h5",
@@ -106,7 +108,7 @@ error_table = pd.DataFrame({'reconstruction_error': rmse,
 error_table['predicted_class'] = np.where(error_table['reconstruction_error'] >= min(error_table.nlargest(test_set_positives,'reconstruction_error', keep='first')['reconstruction_error']), 'surveil', 'other')
 
 #get confusion matrix
-confusion_matrix(error_table['true_class'],error_table['predicted_class'])
+print(confusion_matrix(error_table['true_class'],error_table['predicted_class']))
 
 
 
