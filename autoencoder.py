@@ -42,13 +42,13 @@ labelled_data['type']=labelled_data['type'].astype('category').cat.codes
 labelled_data=labelled_data.drop(['adshex'],axis=1)
 
 df=df[~df['adshex'].isin(test_ident['adshex'])]
-df_adshex=df['adshex']
-df=df.drop(['adshex'],axis=1)
+
 
 #make a training and testing set and process
 #use the labelled data to test, use some of the unlabelled data to train (assume that very few entries will be of class surveil in the unlabelled data)
 #use 10% of the input data as a training set
 df,train_set=train_test_split(df,test_size=0.1,random_state=57)
+train_set=train_set.drop(['adshex'],axis=1)
 
 #also consider adding some of the actual data to the train/test set to improve the size
 test_set = labelled_data
@@ -63,6 +63,10 @@ test_set = test_set.drop(['class'], axis=1)
 train_set = preprocessing.MinMaxScaler().fit_transform(train_set.values)
 test_set = preprocessing.MinMaxScaler().fit_transform(test_set.values)
 
+
+df_adshex=df['adshex']
+df=df.drop(['adshex'],axis=1)
+df = preprocessing.MinMaxScaler().fit_transform(df.values)
 
 #define layers
 input_dim = test_set.shape[1]
@@ -118,3 +122,35 @@ fig,ax=plt.subplots()
 for name, group in groups:
     ax.plot(group.index,group.reconstruction_error,marker='o', ms=3.5, linestyle='',
             label= name)
+    ax.legend()
+plt.title("Reconstruction error for each instance in the test set")
+plt.ylabel("RMSE")
+plt.xlabel("point index")
+plt.show();
+
+
+#apply model to unlabelled data
+#predict on testing set
+predictions=autoencoder.predict(df)
+rmse = pow(np.mean(np.power(df - predictions, 2), axis=1),0.5)
+error_table = pd.DataFrame({'reconstruction_error': rmse,
+                        'aircraft_ident': df_adshex})
+    
+#plot reconstruction error
+fig,ax=plt.subplots()
+i=0
+plt.scatter(error_table.index.tolist(),error_table['reconstruction_error'],s=1)
+plt.title("Reconstruction error for each instance in the dataset")
+plt.ylabel("RMSE")
+plt.xlabel("point index")
+ax.hlines(0.2, ax.get_xlim()[0], ax.get_xlim()[1], colors="g", zorder=100, label='Threshold')
+plt.show();
+
+
+#get identifiers for predicted spyplanes
+error_table['adshex']=df_adshex
+positive_identifications=error_table[error_table['reconstruction_error']>=0.2]
+
+#compare to previous results
+pa_results=pd.read_csv("C:\\Users\\Alex\\Documents\\GitHub\\autoencoder-planes\\autoencoder-anomaly-detection\\pa_candidates.csv")
+common=set.intersection(set(positive_identifications['adshex']),set(pa_results['adshex']))
