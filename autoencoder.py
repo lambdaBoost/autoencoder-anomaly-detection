@@ -23,6 +23,7 @@ from keras.layers import Input, Dense
 from keras.callbacks import ModelCheckpoint, TensorBoard
 from keras import regularizers
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import confusion_matrix
 
 #import dataset
 df=pd.read_csv("C:\\Users\\Alex\\Documents\\datasets\\spy-plane-finder\\planes_features.csv")
@@ -42,10 +43,19 @@ labelled_data=labelled_data.drop(['adshex'],axis=1)
 df=df[~df['adshex'].isin(test_ident['adshex'])]
 df=df.drop(['adshex'],axis=1)
 
+#make a training and testing set and process
+#use the labelled data to test, use some of the unlabelled data to train (assume that very few entries will be of class surveil in the unlabelled data)
+#use 10% of the input data as a training set
+df,train_set=train_test_split(df,test_size=0.1,random_state=57)
+
 #preprocess - consider scaling/standardising at this point
-train_set, test_set = train_test_split(labelled_data, test_size=0.2,random_state=57)
-train_set = train_set[train_set['class'] == 'other']
-train_set = train_set.drop(['class'], axis=1)
+#also consider adding some of the actual data to the train/test set to improve the size
+test_set = labelled_data
+
+#save test set labels for later
+test_set_labels=test_set['class']
+#get number of positive classes in test set
+test_set_positives=len(test_set[test_set['class']=='surveil'])
 test_set = test_set.drop(['class'], axis=1)
 
 train_set = train_set.values
@@ -68,7 +78,7 @@ autoencoder = Model(inputs=input_layer, outputs=decoder)
 
 
 nb_epoch = 25
-batch_size = 32
+batch_size = 500
 autoencoder.compile(optimizer='adam', 
                     loss='mean_squared_error', 
                     metrics=['accuracy'])
@@ -93,8 +103,14 @@ autoencoder=load_model('model.h5')
 predictions=autoencoder.predict(test_set)
 
 
+rmse = pow(np.mean(np.power(test_set - predictions, 2), axis=1),0.5)
+error_df = pd.DataFrame({'reconstruction_error': rmse,
+                        'true_class': test_set_labels})
+#we know how many entries have a positive in the test set. Take this number and label the predictions with the highest rmse (ie the outliers) with the positiveclass prediction
+error_df['predicted_class'] = np.where(error_df['reconstruction_error'] >= min(error_df.nlargest(test_set_positives,'reconstruction_error', keep='first')['reconstruction_error']), 'surveil', 'other')
 
+#get confusion matrix
+confusion_matrix(error_df['true_class'],error_df['predicted_class'])
 
-
-
+pd.write_csv(error_df,)
 
