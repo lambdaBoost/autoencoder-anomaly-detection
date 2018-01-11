@@ -74,9 +74,9 @@ encoding_dim = int(input_dim/2)
 
 input_layer = Input(shape=(input_dim, ))
 encoder = Dense(encoding_dim, activation="tanh", 
-                activity_regularizer=regularizers.l1(10e-5))(input_layer)
+                activity_regularizer=regularizers.l1(10e-7))(input_layer)
 encoder = Dense(int(encoding_dim / 2), activation="relu")(encoder)
-decoder = Dense(int(encoding_dim / 2), activation='tanh')(encoder)
+decoder = Dense(int(encoding_dim / 2), activation="tanh")(encoder)
 decoder = Dense(input_dim, activation='relu')(decoder)
 autoencoder = Model(inputs=input_layer, outputs=decoder)
 
